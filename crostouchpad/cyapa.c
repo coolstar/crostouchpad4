@@ -355,10 +355,10 @@ Status
 		pDevice->Flags[i] = 0;
 	}
 
-	BOOTTRACKPAD(pDevice);
-
 	pDevice->RegsSet = false;
 	pDevice->ConnectInterrupt = true;
+
+	BOOTTRACKPAD(pDevice);
 
 	return status;
 }
@@ -388,6 +388,8 @@ Status
 	UNREFERENCED_PARAMETER(FxPreviousState);
 
 	PCYAPA_CONTEXT pDevice = GetDeviceContext(FxDevice);
+
+	cyapa_set_power_mode(pDevice, CMD_POWER_MODE_OFF);
 
 	WdfTimerStop(pDevice->Timer, TRUE);
 
