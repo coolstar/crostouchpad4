@@ -348,6 +348,8 @@ Status
 
 	PCYAPA_CONTEXT pDevice = GetDeviceContext(FxDevice);
 	NTSTATUS status = STATUS_SUCCESS;
+	
+	cyapa_set_power_mode(pDevice, CMD_POWER_MODE_FULL);
 
 	WdfTimerStart(pDevice->Timer, WDF_REL_TIMEOUT_IN_MS(10));
 
@@ -389,12 +391,8 @@ Status
 
 	PCYAPA_CONTEXT pDevice = GetDeviceContext(FxDevice);
 
-	if (FxTargetState != 5) {
-
 	cyapa_set_power_mode(pDevice, CMD_POWER_MODE_OFF);
 	
-	}
-
 	WdfTimerStop(pDevice->Timer, TRUE);
 
 	pDevice->ConnectInterrupt = false;
