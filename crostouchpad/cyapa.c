@@ -390,8 +390,6 @@ Status
 	UNREFERENCED_PARAMETER(FxTargetState);
 
 	PCYAPA_CONTEXT pDevice = GetDeviceContext(FxDevice);
-
-	cyapa_set_power_mode(pDevice, CMD_POWER_MODE_OFF);
 	
 	WdfTimerStop(pDevice->Timer, TRUE);
 
