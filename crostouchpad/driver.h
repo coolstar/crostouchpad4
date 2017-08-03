@@ -107,13 +107,21 @@
 	0x95, 0x07,                          /*   REPORT_COUNT (7)                   */  \
 	0x81, 0x03,                         /*    INPUT (Cnst,Var,Abs)     */  \
 	0x05, 0x0d,                         /*    USAGE_PAGE (Digitizer)     */  \
-	0x85, REPORTID_MTOUCH,            /*   REPORT_ID (Feature)                   */  \
+	0x85, REPORTID_MTOUCH,				/*   REPORT_ID (Feature)                   */  \
 	0x09, 0x55,                         /*    USAGE (Contact Count Maximum)     */  \
 	0x09, 0x59,                         /*    USAGE (Pad TYpe)     */  \
 	0x75, 0x08,                         /*    REPORT_SIZE (8)      */  \
 	0x95, 0x02,                         /*    REPORT_COUNT (2)     */  \
 	0x25, 0x0f,                         /*    LOGICAL_MAXIMUM (15)     */  \
 	0xb1, 0x02,                         /*    FEATURE (Data,Var,Abs)     */  \
+	0x06, 0x00, 0xFF,					/*    Usage Page (Vendor Defined 0xFF00)     */ \
+	0x85, REPORTID_PTPHQA,				/*    Report ID (Certification)     */ \
+	0x09, 0xC5,							/*    Usage (0xC5)     */ \
+	0x15, 0x00,							/*    Logical Minimum (0)     */ \
+	0x26, 0xFF, 0x00,					/*    Logical Maximum (255)     */ \
+	0x75, 0x08,							/*    Report Size (8)     */ \
+	0x96, 0x00, 0x01,					/*    Report Count (256)     */ \
+	0xB1, 0x02,							/*    Feature (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)     */ \
 	0xc0,                               /*   END_COLLECTION                      */  \
 	\
 	/*MOUSE TLC     */  \
