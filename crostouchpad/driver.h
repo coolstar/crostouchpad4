@@ -27,8 +27,6 @@
 #define DRIVERNAME                 "crostouchpad4.sys: "
 
 #define CYAPA_POOL_TAG            (ULONG) 'payC'
-#define CYAPA_HARDWARE_IDS        L"CoolStar\\CYAP0000\0\0"
-#define CYAPA_HARDWARE_IDS_LENGTH sizeof(CYAPA_HARDWARE_IDS)
 
 #define NTDEVICE_NAME_STRING       L"\\Device\\CYAP0000"
 #define SYMBOLIC_NAME_STRING       L"\\DosDevices\\CYAP0000"
