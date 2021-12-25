@@ -732,6 +732,9 @@ IN PWDFDEVICE_INIT DeviceInit
 
 	devContext = GetDeviceContext(device);
 
+	devContext->FxDevice = device;
+	devContext->ConnectInterrupt = false;
+
 	WDF_IO_QUEUE_CONFIG_INIT(&queueConfig, WdfIoQueueDispatchManual);
 
 	queueConfig.PowerManaged = WdfFalse;
@@ -794,7 +797,6 @@ IN PWDFDEVICE_INIT DeviceInit
 	//
 
 	devContext->DeviceMode = DEVICE_MODE_MOUSE;
-	devContext->FxDevice = device;
 
 	return status;
 }
