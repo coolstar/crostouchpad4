@@ -56,19 +56,24 @@ __in PUNICODE_STRING RegistryPath
 	return status;
 }
 
-void cyapa_set_power_mode(_In_  PCYAPA_CONTEXT  pDevice, _In_ uint8_t power_mode)
+NTSTATUS cyapa_set_power_mode(_In_  PCYAPA_CONTEXT  pDevice, _In_ uint8_t power_mode)
 {
+	NTSTATUS status;
 	int ret;
 	uint8_t power;
 
-	SpbReadDataSynchronously(&pDevice->I2CContext, CMD_POWER_MODE, &ret, 1);
+	status = SpbReadDataSynchronously(&pDevice->I2CContext, CMD_POWER_MODE, &ret, 1);
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
 	if (ret < 0)
-		return;
+		return STATUS_INVALID_DEVICE_STATE;
 
 	power = (ret & ~0xFC);
 	power |= power_mode & 0xFc;
 
-	SpbWriteDataSynchronously(&pDevice->I2CContext, CMD_POWER_MODE, &power, 1);
+	status = SpbWriteDataSynchronously(&pDevice->I2CContext, CMD_POWER_MODE, &power, 1);
+	return status;
 }
 
 VOID
@@ -76,15 +81,24 @@ CyapaBootWorkItem(
 	IN WDFWORKITEM  WorkItem
 )
 {
+	NTSTATUS status;
 	WDFDEVICE Device = (WDFDEVICE)WdfWorkItemGetParentObject(WorkItem);
 	PCYAPA_CONTEXT pDevice = GetDeviceContext(Device);
 
-	struct cyapa_cap cap;
-	SpbReadDataSynchronously(&pDevice->I2CContext, CMD_QUERY_CAPABILITIES, &cap, sizeof(cap));
+	struct cyapa_cap cap = { 0 };
+	status = SpbReadDataSynchronously(&pDevice->I2CContext, CMD_QUERY_CAPABILITIES, &cap, sizeof(cap));
+	if (!NT_SUCCESS(status)) {
+		WdfObjectDelete(WorkItem);
+		return;
+	}
 	if (strncmp((const char *)cap.prod_ida, "CYTRA", 5) != 0) {
 		CyapaPrint(DEBUG_LEVEL_ERROR, DBG_PNP, "[cyapainit] Product ID \"%5.5s\" mismatch\n",
 			cap.prod_ida);
-		SpbReadDataSynchronously(&pDevice->I2CContext, CMD_QUERY_CAPABILITIES, &cap, sizeof(cap));
+		status = SpbReadDataSynchronously(&pDevice->I2CContext, CMD_QUERY_CAPABILITIES, &cap, sizeof(cap));
+		if (!NT_SUCCESS(status)) {
+			WdfObjectDelete(WorkItem);
+			return;
+		}
 	}
 
 	pDevice->max_x = ((cap.max_abs_xy_high << 4) & 0x0F00) |
@@ -131,6 +145,8 @@ CyapaBootWorkItem(
 	pDevice->phy_y_hid[1] = phy_y8bit[1];
 
 	cyapa_set_power_mode(pDevice, CMD_POWER_MODE_FULL);
+
+	pDevice->ConnectInterrupt = true;
 	WdfObjectDelete(WorkItem);
 }
 
@@ -159,7 +175,7 @@ NTSTATUS BOOTTRACKPAD(
 	_In_  PCYAPA_CONTEXT  pDevice
 	)
 {
-	NTSTATUS status = 0;
+	NTSTATUS status;
 
 	static char bl_exit[] = {
 		0x00, 0xff, 0xa5, 0x00, 0x01,
@@ -169,15 +185,22 @@ NTSTATUS BOOTTRACKPAD(
 		0x00, 0xff, 0x3b, 0x00, 0x01,
 		0x02, 0x03, 0x04, 0x05, 0x06, 0x07 };
 
-	struct cyapa_boot_regs boot;
+	struct cyapa_boot_regs boot = { 0 };
 
-	SpbReadDataSynchronously(&pDevice->I2CContext, CMD_BOOT_STATUS, &boot, sizeof(boot));
+	status = SpbReadDataSynchronously(&pDevice->I2CContext, CMD_BOOT_STATUS, &boot, sizeof(boot));
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
 
 	if ((boot.stat & CYAPA_STAT_RUNNING) == 0) {
 		if (boot.error & CYAPA_ERROR_BOOTLOADER)
-			SpbWriteDataSynchronously(&pDevice->I2CContext, CMD_BOOT_STATUS, bl_deactivate, sizeof(bl_deactivate));
+			status = SpbWriteDataSynchronously(&pDevice->I2CContext, CMD_BOOT_STATUS, bl_deactivate, sizeof(bl_deactivate));
 		else
-			SpbWriteDataSynchronously(&pDevice->I2CContext, CMD_BOOT_STATUS, bl_exit, sizeof(bl_exit));
+			status = SpbWriteDataSynchronously(&pDevice->I2CContext, CMD_BOOT_STATUS, bl_exit, sizeof(bl_exit));
+
+		if (!NT_SUCCESS(status)) {
+			return status;
+		}
 	}
 
 	WDF_TIMER_CONFIG              timerConfig;
@@ -288,6 +311,13 @@ Status
 		return status;
 	}
 
+	struct cyapa_boot_regs boot = { 0 };
+
+	status = SpbReadDataSynchronously(&pDevice->I2CContext, CMD_BOOT_STATUS, &boot, sizeof(boot));
+	if (!NT_SUCCESS(status)) {
+		return status;
+	}
+
 	return status;
 }
 
@@ -348,8 +378,6 @@ Status
 
 	PCYAPA_CONTEXT pDevice = GetDeviceContext(FxDevice);
 	NTSTATUS status = STATUS_SUCCESS;
-	
-	cyapa_set_power_mode(pDevice, CMD_POWER_MODE_FULL);
 
 	WdfTimerStart(pDevice->Timer, WDF_REL_TIMEOUT_IN_MS(10));
 
@@ -358,7 +386,6 @@ Status
 	}
 
 	pDevice->RegsSet = false;
-	pDevice->ConnectInterrupt = true;
 
 	BOOTTRACKPAD(pDevice);
 
@@ -407,7 +434,7 @@ BOOLEAN OnInterruptIsr(
 	PCYAPA_CONTEXT pDevice = GetDeviceContext(Device);
 
 	if (!pDevice->ConnectInterrupt)
-		return true;
+		return false;
 
 	LARGE_INTEGER CurrentTime;
 
@@ -420,8 +447,10 @@ BOOLEAN OnInterruptIsr(
 	if (pDevice->LastTime.QuadPart != 0)
 		DIFF.QuadPart = (CurrentTime.QuadPart - pDevice->LastTime.QuadPart) / 1000;
 
-	struct cyapa_regs rawregs;
-	SpbReadDataSynchronously(&pDevice->I2CContext, 0, &rawregs, sizeof(rawregs));
+	struct cyapa_regs rawregs = { 0 };
+	if (!NT_SUCCESS(SpbReadDataSynchronously(&pDevice->I2CContext, 0, &rawregs, sizeof(rawregs)))) {
+		return false;
+	}
 	struct cyapa_regs *regs = &rawregs;
 
 	struct _CYAPA_MULTITOUCH_REPORT report;

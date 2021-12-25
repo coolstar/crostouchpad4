@@ -195,56 +195,88 @@
       <WppEnabled>true</WppEnabled>
       <WppScanConfigurationData Condition="'%(ClCompile. ScanConfigurationData)'  == ''">trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
+    <Inf>
+      <TimeStamp>4.1.2</TimeStamp>
+    </Inf>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|Win32'">
     <ClCompile>
       <WppEnabled>true</WppEnabled>
       <WppScanConfigurationData Condition="'%(ClCompile. ScanConfigurationData)'  == ''">trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
+    <Inf>
+      <TimeStamp>4.1.2</TimeStamp>
+    </Inf>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|Win32'">
     <ClCompile>
       <WppEnabled>true</WppEnabled>
       <WppScanConfigurationData Condition="'%(ClCompile. ScanConfigurationData)'  == ''">trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
+    <Inf>
+      <TimeStamp>4.1.2</TimeStamp>
+    </Inf>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Release|Win32'">
     <ClCompile>
       <WppEnabled>true</WppEnabled>
       <WppScanConfigurationData Condition="'%(ClCompile. ScanConfigurationData)'  == ''">trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
+    <Inf>
+      <TimeStamp>4.1.2</TimeStamp>
+    </Inf>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Debug|Win32'">
     <ClCompile>
       <WppEnabled>true</WppEnabled>
       <WppScanConfigurationData Condition="'%(ClCompile. ScanConfigurationData)'  == ''">trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
+    <Inf>
+      <TimeStamp>4.1.2</TimeStamp>
+    </Inf>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Release|Win32'">
     <ClCompile>
       <WppEnabled>true</WppEnabled>
       <WppScanConfigurationData Condition="'%(ClCompile. ScanConfigurationData)'  == ''">trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
+    <Inf>
+      <TimeStamp>4.1.2</TimeStamp>
+    </Inf>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Debug|x64'">
     <ClCompile>
       <WppEnabled>true</WppEnabled>
       <WppScanConfigurationData Condition="'%(ClCompile. ScanConfigurationData)'  == ''">trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
+    <Inf>
+      <TimeStamp>4.1.2</TimeStamp>
+    </Inf>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8.1 Release|x64'">
     <ClCompile>
       <WppEnabled>true</WppEnabled>
       <WppScanConfigurationData Condition="'%(ClCompile. ScanConfigurationData)'  == ''">trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
+    <Inf>
+      <TimeStamp>4.1.2</TimeStamp>
+    </Inf>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Debug|x64'">
     <ClCompile>
@@ -253,6 +285,9 @@
       <WppKernelMode>true</WppKernelMode>
       <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
+    <Inf>
+      <TimeStamp>4.1.2</TimeStamp>
+    </Inf>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win8 Release|x64'">
     <ClCompile>
@@ -262,10 +297,11 @@
       <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
     <Inf>
-      <TimeStamp>4.1.1</TimeStamp>
+      <TimeStamp>4.1.2</TimeStamp>
     </Inf>
     <DriverSign>
-      <FileDigestAlgorithm>SHA256</FileDigestAlgorithm>
+      <FileDigestAlgorithm>
+      </FileDigestAlgorithm>
     </DriverSign>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Debug|x64'">
@@ -273,14 +309,22 @@
       <WppEnabled>true</WppEnabled>
       <WppScanConfigurationData Condition="'%(ClCompile. ScanConfigurationData)'  == ''">trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
+    <Inf>
+      <TimeStamp>4.1.2</TimeStamp>
+    </Inf>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Win7 Release|x64'">
     <ClCompile>
       <WppEnabled>true</WppEnabled>
       <WppScanConfigurationData Condition="'%(ClCompile. ScanConfigurationData)'  == ''">trace.h</WppScanConfigurationData>
       <WppKernelMode>true</WppKernelMode>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </ClCompile>
+    <Inf>
+      <TimeStamp>4.1.2</TimeStamp>
+    </Inf>
   </ItemDefinitionGroup>
   <ItemGroup>
     <Inf Include="crostouchpad.inf" />
