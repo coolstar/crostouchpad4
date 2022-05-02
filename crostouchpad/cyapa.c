@@ -59,7 +59,7 @@ __in PUNICODE_STRING RegistryPath
 NTSTATUS cyapa_set_power_mode(_In_  PCYAPA_CONTEXT  pDevice, _In_ uint8_t power_mode)
 {
 	NTSTATUS status;
-	int ret;
+	uint8_t ret = 0;
 	uint8_t power;
 
 	status = SpbReadDataSynchronously(&pDevice->I2CContext, CMD_POWER_MODE, &ret, 1);
@@ -152,7 +152,6 @@ CyapaBootWorkItem(
 
 void CyapaBootTimer(_In_ WDFTIMER hTimer) {
 	WDFDEVICE Device = (WDFDEVICE)WdfTimerGetParentObject(hTimer);
-	PCYAPA_CONTEXT pDevice = GetDeviceContext(Device);
 
 	WDF_OBJECT_ATTRIBUTES attributes;
 	WDF_WORKITEM_CONFIG workitemConfig;
@@ -379,7 +378,7 @@ Status
 	PCYAPA_CONTEXT pDevice = GetDeviceContext(FxDevice);
 	NTSTATUS status = STATUS_SUCCESS;
 
-	for (int i = 0; i < 20; i++){
+	for (int i = 0; i < 15; i++){
 		pDevice->Flags[i] = 0;
 	}
 
@@ -489,20 +488,20 @@ BOOLEAN OnInterruptIsr(
 				updateValues = true;
 
 			if (updateValues) {
-				pDevice->XValue[i] = x[i];
-				pDevice->YValue[i] = y[i];
-				pDevice->PValue[i] = p[i];
+				pDevice->XValue[i] = (USHORT)x[i];
+				pDevice->YValue[i] = (USHORT)y[i];
+				pDevice->PValue[i] = (USHORT)p[i];
 			}
 		}
 	}
 
 	pDevice->BUTTONPRESSED = ((regs->fngr & CYAPA_FNGR_LEFT) != 0);
 
-	pDevice->TIMEINT += DIFF.QuadPart;
+	pDevice->TIMEINT += (USHORT)DIFF.QuadPart;
 
 	pDevice->LastTime = CurrentTime;
 
-	int count = 0, i = 0;
+	BYTE count = 0, i = 0;
 	while (count < 5 && i < 15) {
 		if (pDevice->Flags[i] != 0) {
 			report.Touch[count].ContactID = i;
@@ -554,7 +553,6 @@ IN PWDFDEVICE_INIT DeviceInit
 	WDFDEVICE                     device;
 	WDF_INTERRUPT_CONFIG interruptConfig;
 	WDFQUEUE                      queue;
-	UCHAR                         minorFunction;
 	PCYAPA_CONTEXT               devContext;
 
 	UNREFERENCED_PARAMETER(Driver);
@@ -1169,10 +1167,11 @@ IN PCYAPA_CONTEXT DevContext,
 IN WDFREQUEST Request
 )
 {
+	UNREFERENCED_PARAMETER(DevContext);
+
 	NTSTATUS status = STATUS_SUCCESS;
 	WDF_REQUEST_PARAMETERS params;
 	PHID_XFER_PACKET transferPacket = NULL;
-	size_t bytesWritten = 0;
 
 	CyapaPrint(DEBUG_LEVEL_VERBOSE, DBG_IOCTL,
 		"CyapaWriteReport Entry\n");
@@ -1352,6 +1351,8 @@ IN WDFREQUEST Request,
 OUT BOOLEAN* CompleteRequest
 )
 {
+	UNREFERENCED_PARAMETER(CompleteRequest);
+
 	NTSTATUS status = STATUS_SUCCESS;
 	WDF_REQUEST_PARAMETERS params;
 	PHID_XFER_PACKET transferPacket = NULL;
@@ -1438,6 +1439,8 @@ IN WDFREQUEST Request,
 OUT BOOLEAN* CompleteRequest
 )
 {
+	UNREFERENCED_PARAMETER(CompleteRequest);
+
 	NTSTATUS status = STATUS_SUCCESS;
 	WDF_REQUEST_PARAMETERS params;
 	PHID_XFER_PACKET transferPacket = NULL;
