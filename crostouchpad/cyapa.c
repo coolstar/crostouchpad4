@@ -379,8 +379,6 @@ Status
 	PCYAPA_CONTEXT pDevice = GetDeviceContext(FxDevice);
 	NTSTATUS status = STATUS_SUCCESS;
 
-	WdfTimerStart(pDevice->Timer, WDF_REL_TIMEOUT_IN_MS(10));
-
 	for (int i = 0; i < 20; i++){
 		pDevice->Flags[i] = 0;
 	}
@@ -417,8 +415,6 @@ Status
 	UNREFERENCED_PARAMETER(FxTargetState);
 
 	PCYAPA_CONTEXT pDevice = GetDeviceContext(FxDevice);
-	
-	WdfTimerStop(pDevice->Timer, TRUE);
 
 	pDevice->ConnectInterrupt = false;
 
@@ -544,104 +540,6 @@ BOOLEAN OnInterruptIsr(
 
 	pDevice->RegsSet = true;
 	return true;
-}
-
-VOID
-CyapaReadWriteWorkItem(
-	IN WDFWORKITEM  WorkItem
-	)
-{
-	WDFDEVICE Device = (WDFDEVICE)WdfWorkItemGetParentObject(WorkItem);
-	PCYAPA_CONTEXT pDevice = GetDeviceContext(Device);
-
-	WdfObjectDelete(WorkItem);
-
-	if (!pDevice->ConnectInterrupt)
-		return;
-
-	struct _CYAPA_MULTITOUCH_REPORT report;
-	report.ReportID = REPORTID_MTOUCH;
-
-	LARGE_INTEGER CurrentTime;
-
-	KeQuerySystemTimePrecise(&CurrentTime);
-
-	LARGE_INTEGER DIFF;
-
-	DIFF.QuadPart = 0;
-
-	if (pDevice->LastTime.QuadPart != 0)
-		DIFF.QuadPart = (CurrentTime.QuadPart - pDevice->LastTime.QuadPart) / 500;
-
-	pDevice->TIMEINT += DIFF.QuadPart;
-
-	pDevice->LastTime = CurrentTime;
-
-	int count = 0, i = 0;
-	while (count < 5 && i < 15) {
-		if (pDevice->Flags[i] != 0) {
-			report.Touch[count].ContactID = i;
-
-			report.Touch[count].XValue = pDevice->XValue[i];
-			report.Touch[count].YValue = pDevice->YValue[i];
-			report.Touch[count].Pressure = pDevice->PValue[i];
-
-			uint8_t flags = pDevice->Flags[i];
-			if (flags & MXT_T9_DETECT) {
-				report.Touch[count].Status = MULTI_CONFIDENCE_BIT | MULTI_TIPSWITCH_BIT;
-			}
-			else if (flags & MXT_T9_PRESS) {
-				report.Touch[count].Status = MULTI_CONFIDENCE_BIT | MULTI_TIPSWITCH_BIT;
-			}
-			else if (flags & MXT_T9_RELEASE) {
-				report.Touch[count].Status = MULTI_CONFIDENCE_BIT;
-				pDevice->Flags[i] = 0;
-			}
-			else
-				report.Touch[count].Status = 0;
-
-			count++;
-		}
-		i++;
-	}
-
-	report.ScanTime = pDevice->TIMEINT;
-	report.IsDepressed = pDevice->BUTTONPRESSED;
-
-	report.ContactCount = count;
-
-	size_t bytesWritten;
-	CyapaProcessVendorReport(pDevice, &report, sizeof(report), &bytesWritten);
-}
-
-void CyapaTimerFunc(_In_ WDFTIMER hTimer){
-	return;
-	WDFDEVICE Device = (WDFDEVICE)WdfTimerGetParentObject(hTimer);
-	PCYAPA_CONTEXT pDevice = GetDeviceContext(Device);
-
-	if (!pDevice->ConnectInterrupt)
-		return;
-
-	/*if (!pDevice->RegsSet)
-		return;*/
-
-	PCYAPA_CONTEXT context;
-	WDF_OBJECT_ATTRIBUTES attributes;
-	WDF_WORKITEM_CONFIG workitemConfig;
-	WDFWORKITEM hWorkItem;
-
-	WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
-	WDF_OBJECT_ATTRIBUTES_SET_CONTEXT_TYPE(&attributes, CYAPA_CONTEXT);
-	attributes.ParentObject = Device;
-	WDF_WORKITEM_CONFIG_INIT(&workitemConfig, CyapaReadWriteWorkItem);
-
-	WdfWorkItemCreate(&workitemConfig,
-		&attributes,
-		&hWorkItem);
-
-	WdfWorkItemEnqueue(hWorkItem);
-
-	return;
 }
 
 NTSTATUS
@@ -774,21 +672,6 @@ IN PWDFDEVICE_INIT DeviceInit
 			"Error creating WDF interrupt object - %!STATUS!",
 			status);
 
-		return status;
-	}
-
-	WDF_TIMER_CONFIG              timerConfig;
-	WDFTIMER                      hTimer;
-
-	WDF_TIMER_CONFIG_INIT_PERIODIC(&timerConfig, CyapaTimerFunc, 10);
-
-	WDF_OBJECT_ATTRIBUTES_INIT(&attributes);
-	attributes.ParentObject = device;
-	status = WdfTimerCreate(&timerConfig, &attributes, &hTimer);
-	devContext->Timer = hTimer;
-	if (!NT_SUCCESS(status))
-	{
-		CyapaPrint(DEBUG_LEVEL_ERROR, DBG_PNP, "(%!FUNC!) WdfTimerCreate failed status:%!STATUS!\n", status);
 		return status;
 	}
 

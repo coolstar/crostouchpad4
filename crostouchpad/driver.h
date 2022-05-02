@@ -215,8 +215,6 @@ typedef struct _CYAPA_CONTEXT
 
 	BOOLEAN RegsSet;
 
-	WDFTIMER Timer;
-
 	uint8_t      Flags[15];
 
 	USHORT XValue[15];
