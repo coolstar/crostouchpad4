@@ -147,6 +147,9 @@ CyapaBootWorkItem(
 	cyapa_set_power_mode(pDevice, CMD_POWER_MODE_FULL);
 
 	pDevice->ConnectInterrupt = true;
+
+	CyapaCompleteIdleIrp(pDevice);
+
 	WdfObjectDelete(WorkItem);
 }
 
@@ -650,6 +653,28 @@ IN PWDFDEVICE_INIT DeviceInit
 	}
 
 	//
+	// Create manual I/O queue to take care of idle power requests
+	//
+
+	WDF_IO_QUEUE_CONFIG_INIT(&queueConfig, WdfIoQueueDispatchManual);
+
+	queueConfig.PowerManaged = WdfFalse;
+
+	status = WdfIoQueueCreate(device,
+		&queueConfig,
+		WDF_NO_OBJECT_ATTRIBUTES,
+		&devContext->IdleQueue
+	);
+
+	if (!NT_SUCCESS(status))
+	{
+		CyapaPrint(DEBUG_LEVEL_ERROR, DBG_PNP,
+			"WdfIoQueueCreate failed 0x%x\n", status);
+
+		return status;
+	}
+
+	//
 	// Create an interrupt object for hardware notifications
 	//
 	WDF_INTERRUPT_CONFIG_INIT(
@@ -680,6 +705,234 @@ IN PWDFDEVICE_INIT DeviceInit
 	devContext->DeviceMode = DEVICE_MODE_MOUSE;
 
 	return status;
+}
+
+void
+CyapaIdleIrpWorkItem
+(
+	IN WDFWORKITEM IdleWorkItem
+)
+{
+	NTSTATUS status;
+	PIDLE_WORKITEM_CONTEXT idleWorkItemContext;
+	PCYAPA_CONTEXT deviceContext;
+	PHID_SUBMIT_IDLE_NOTIFICATION_CALLBACK_INFO idleCallbackInfo;
+
+	idleWorkItemContext = GetIdleWorkItemContext(IdleWorkItem);
+	NT_ASSERT(idleWorkItemContext != NULL);
+
+	deviceContext = GetDeviceContext(idleWorkItemContext->FxDevice);
+	NT_ASSERT(deviceContext != NULL);
+
+	//
+	// Get the idle callback info from the workitem context
+	//
+	PIRP irp = WdfRequestWdmGetIrp(idleWorkItemContext->FxRequest);
+	PIO_STACK_LOCATION stackLocation = IoGetCurrentIrpStackLocation(irp);
+
+	idleCallbackInfo = (PHID_SUBMIT_IDLE_NOTIFICATION_CALLBACK_INFO)
+		(stackLocation->Parameters.DeviceIoControl.Type3InputBuffer);
+
+	//
+	// idleCallbackInfo is validated already, so invoke idle callback
+	//
+	idleCallbackInfo->IdleCallback(idleCallbackInfo->IdleContext);
+
+	//
+	// Park this request in our IdleQueue and mark it as pending
+	// This way if the IRP was cancelled, WDF will cancel it for us
+	//
+	status = WdfRequestForwardToIoQueue(
+		idleWorkItemContext->FxRequest,
+		deviceContext->IdleQueue);
+
+	if (!NT_SUCCESS(status))
+	{
+		//
+		// IdleQueue is a manual-dispatch, non-power-managed queue. This should
+		// *never* fail.
+		//
+
+		NT_ASSERTMSG("WdfRequestForwardToIoQueue to IdleQueue failed!", FALSE);
+
+		CyapaPrint(DEBUG_LEVEL_INFO, DBG_IOCTL,
+			"Error forwarding idle notification Request:0x%p to IdleQueue:0x%p - %!STATUS!",
+			idleWorkItemContext->FxRequest,
+			deviceContext->IdleQueue,
+			status);
+
+		//
+		// Complete the request if we couldnt forward to the Idle Queue
+		//
+		WdfRequestComplete(idleWorkItemContext->FxRequest, status);
+	}
+	else
+	{
+		CyapaPrint(DEBUG_LEVEL_INFO, DBG_IOCTL,
+			"Forwarded idle notification Request:0x%p to IdleQueue:0x%p - %!STATUS!",
+			idleWorkItemContext->FxRequest,
+			deviceContext->IdleQueue,
+			status);
+	}
+
+	//
+	// Delete the workitem since we're done with it
+	//
+	WdfObjectDelete(IdleWorkItem);
+
+	return;
+}
+
+NTSTATUS
+CyapaProcessIdleRequest(
+	IN PCYAPA_CONTEXT pDevice,
+	IN WDFREQUEST Request,
+	OUT BOOLEAN* Complete
+)
+{
+	PHID_SUBMIT_IDLE_NOTIFICATION_CALLBACK_INFO idleCallbackInfo;
+	PIRP irp;
+	PIO_STACK_LOCATION irpSp;
+	NTSTATUS status;
+
+	NT_ASSERT(Complete != NULL);
+	*Complete = TRUE;
+
+	//
+	// Retrieve request parameters and validate
+	//
+	irp = WdfRequestWdmGetIrp(Request);
+	irpSp = IoGetCurrentIrpStackLocation(irp);
+
+	if (irpSp->Parameters.DeviceIoControl.InputBufferLength <
+		sizeof(HID_SUBMIT_IDLE_NOTIFICATION_CALLBACK_INFO))
+	{
+		status = STATUS_INVALID_BUFFER_SIZE;
+
+		CyapaPrint(DEBUG_LEVEL_INFO, DBG_IOCTL,
+			"Error: Input buffer is too small to process idle request - %!STATUS!",
+			status);
+
+		goto exit;
+	}
+
+	//
+	// Grab the callback
+	//
+	idleCallbackInfo = (PHID_SUBMIT_IDLE_NOTIFICATION_CALLBACK_INFO)
+		irpSp->Parameters.DeviceIoControl.Type3InputBuffer;
+
+	NT_ASSERT(idleCallbackInfo != NULL);
+
+	if (idleCallbackInfo == NULL || idleCallbackInfo->IdleCallback == NULL)
+	{
+		status = STATUS_NO_CALLBACK_ACTIVE;
+		CyapaPrint(DEBUG_LEVEL_INFO, DBG_IOCTL,
+			"Error: Idle Notification request %p has no idle callback info - %!STATUS!",
+			Request,
+			status);
+		goto exit;
+	}
+
+	{
+		//
+		// Create a workitem for the idle callback
+		//
+		WDF_OBJECT_ATTRIBUTES workItemAttributes;
+		WDF_WORKITEM_CONFIG workitemConfig;
+		WDFWORKITEM idleWorkItem;
+		PIDLE_WORKITEM_CONTEXT idleWorkItemContext;
+
+		WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&workItemAttributes, IDLE_WORKITEM_CONTEXT);
+		workItemAttributes.ParentObject = pDevice->FxDevice;
+
+		WDF_WORKITEM_CONFIG_INIT(&workitemConfig, CyapaIdleIrpWorkItem);
+
+		status = WdfWorkItemCreate(
+			&workitemConfig,
+			&workItemAttributes,
+			&idleWorkItem
+		);
+
+		if (!NT_SUCCESS(status)) {
+			CyapaPrint(DEBUG_LEVEL_INFO, DBG_IOCTL,
+				"Error creating creating idle work item - %!STATUS!",
+				status);
+			goto exit;
+		}
+
+		//
+		// Set the workitem context
+		//
+		idleWorkItemContext = GetIdleWorkItemContext(idleWorkItem);
+		idleWorkItemContext->FxDevice = pDevice->FxDevice;
+		idleWorkItemContext->FxRequest = Request;
+
+		//
+		// Enqueue a workitem for the idle callback
+		//
+		WdfWorkItemEnqueue(idleWorkItem);
+
+		//
+		// Mark the request as pending so that 
+		// we can complete it when we come out of idle
+		//
+		*Complete = FALSE;
+	}
+
+exit:
+
+	return status;
+}
+
+VOID
+CyapaCompleteIdleIrp(
+	IN PCYAPA_CONTEXT FxDeviceContext
+)
+/*++
+Routine Description:
+	This is invoked when we enter D0.
+	We simply complete the Idle Irp if it hasn't been cancelled already.
+Arguments:
+	FxDeviceContext -  Pointer to Device Context for the device
+Return Value:
+--*/
+{
+	NTSTATUS status;
+	WDFREQUEST request = NULL;
+
+	//
+	// Lets try to retrieve the Idle IRP from the Idle queue
+	//
+	status = WdfIoQueueRetrieveNextRequest(
+		FxDeviceContext->IdleQueue,
+		&request);
+
+	//
+	// We did not find the Idle IRP, maybe it was cancelled
+	// 
+	if (!NT_SUCCESS(status) || (request == NULL))
+	{
+		CyapaPrint(DEBUG_LEVEL_INFO, DBG_IOCTL,
+			"Error finding idle notification request in IdleQueue:0x%p - %!STATUS!",
+			FxDeviceContext->IdleQueue,
+			status);
+	}
+	else
+	{
+		//
+		// Complete the Idle IRP
+		//
+		WdfRequestComplete(request, status);
+
+		CyapaPrint(DEBUG_LEVEL_INFO, DBG_IOCTL,
+			"Completed idle notification Request:0x%p from IdleQueue:0x%p - %!STATUS!",
+			request,
+			FxDeviceContext->IdleQueue,
+			status);
+	}
+
+	return;
 }
 
 VOID
@@ -788,6 +1041,11 @@ IN ULONG        IoControlCode
 		// returns a feature report associated with a top-level collection
 		//
 		status = CyapaGetFeature(devContext, Request, &completeRequest);
+		break;
+
+	case IOCTL_HID_SEND_IDLE_NOTIFICATION_REQUEST:
+		//Handle HID Idle request
+		status = CyapaProcessIdleRequest(devContext, Request, &completeRequest);
 		break;
 
 	case IOCTL_HID_ACTIVATE_DEVICE:
