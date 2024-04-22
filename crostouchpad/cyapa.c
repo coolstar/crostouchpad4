@@ -88,6 +88,7 @@ CyapaBootWorkItem(
 	struct cyapa_cap cap = { 0 };
 	status = SpbReadDataSynchronously(&pDevice->I2CContext, CMD_QUERY_CAPABILITIES, &cap, sizeof(cap));
 	if (!NT_SUCCESS(status)) {
+		CyapaCompleteIdleIrp(pDevice);
 		WdfObjectDelete(WorkItem);
 		return;
 	}
@@ -96,6 +97,7 @@ CyapaBootWorkItem(
 			cap.prod_ida);
 		status = SpbReadDataSynchronously(&pDevice->I2CContext, CMD_QUERY_CAPABILITIES, &cap, sizeof(cap));
 		if (!NT_SUCCESS(status)) {
+			CyapaCompleteIdleIrp(pDevice);
 			WdfObjectDelete(WorkItem);
 			return;
 		}
@@ -387,7 +389,7 @@ Status
 
 	pDevice->RegsSet = false;
 
-	BOOTTRACKPAD(pDevice);
+	status = BOOTTRACKPAD(pDevice);
 
 	return status;
 }
